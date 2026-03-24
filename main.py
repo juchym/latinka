@@ -29,20 +29,23 @@ class State(Enum):
     SC = 1 # after hard consonant
     SJ0 = 2 # after j
     SJC = 3 # after j after hard consonant
-    SA = 4 # afther apostrophe
-    SJA = 5 # afther j after apostrophe
+    SA = 4 # after apostrophe
+    SJA = 5 # after j after apostrophe
 
 class Transliterator:
 
     def __init__(self):
         self.state = State.S0
+        self.composition_preview = ""
 
-    def next(self, c):
+    def next(self, c: str) -> tuple[State, str]:
         match (self.state, c):
-            case (State.S0, "j"): return (State.SJ0, "ј")
-            case (State.SC, "'"): return (State.SA, "'")
-            case (State.SC, "j"): return (State.SJC, "ј")
-            case (State.SA, "j"): return (State.SJA, "ј")
+            case (State.S0, "j"): return (State.SJ0, "")
+            case (State.SC, "'"): return (State.SA, "")
+            case (State.SC, "j"): return (State.SJC, "")
+            case (State.SA, "j"): return (State.SJA, "")
+            
+            case (State.SA, "'"): return (State.S0, "'")
 
             case (State.S0 | State.SC | State.SA, ch) if is_consonant(ch):
                 return (State.SC, conversion_table.get(ch, ch))
@@ -50,50 +53,65 @@ class Transliterator:
                 return (State.S0, conversion_table.get(ch, ch))
             
             case (State.SJ0 | State.SJA, ch) if is_consonant(ch):
-                return (State.SC, f"\bй{conversion_table.get(ch, ch)}")
+                return (State.SC, "й" + conversion_table.get(ch, ch))
             case (State.SJC, ch) if is_consonant(ch):
-                return f"\bь{ch}"
+                return (State.SC, "ь" + conversion_table.get(ch, ch))
             
-            case (State.SJ0, "j"): return (State.S0, "\bй")
-            case (State.SJC, "j"): return (State.S0, "\bь")
+            case (State.SJ0, "j"): return (State.S0, "й")
+            case (State.SJC, "j"): return (State.S0, "ь")
+            case (State.SJA, "j"): return (State.S0, "'й")
 
-            case (State.SJ0 | State.SJC | State.SJA, "a"):
-                return (State.S0, "\bя")
-            case (State.SJ0 | State.SJC | State.SJA, "u"):
-                return (State.S0, "\bю")
-            case (State.SJ0 | State.SJC | State.SJA, "e"):
-                return (State.S0, "\bє")
+            case (State.SJ0 | State.SJC, "a"): return (State.S0, "я")
+            case (State.SJA, "a"): return (State.S0, "'я")
             
-            case (State.SJ0 | State.SJA, "i"): return (State.S0, "\bї")
-            case (State.SJC, "i"): return (State.S0, "\b'ї")
+            case (State.SJ0, "i"): return (State.S0, "ї")
+            case (State.SJC | State.SJA, "i"): return (State.S0, "'ї")
+            
+            case (State.SJ0 | State.SJC, "u"): return (State.S0, "ю")
+            case (State.SJA, "u"): return (State.S0, "'ю")
+            
+            case (State.SJ0 | State.SJC, "e"): return (State.S0, "є")
+            case (State.SJA, "e"): return (State.S0, "'є")
 
-            case (State.SJA, "o"): return (State.S0, "\b\bйо")
+            case (State.SJA, "o"): return (State.S0, "йо")
 
             case (State.SJ0 | State.SJA, ch):
-                return (State.S0, f"\bй{conversion_table.get(ch, ch)}")
+                return (State.S0, "й" + conversion_table.get(ch, ch))
             case (State.SJC, ch):
-                return (State.S0, f"\bь{conversion_table.get(ch, ch)}")
+                return (State.S0, "ь" + conversion_table.get(ch, ch))
 
-    def feed(self, c):
-        self.state, out = self.next(c)
-        return out
+    def _composition_preview_for(self, state: State) -> str:
+        match state:
+            case State.SJ0 | State.SJC: return "ј"
+            case State.SA: return "'"
+            case State.SJA: return "'ј"
+            case _: return ""
 
-    def flush(self):
+    def feed(self, c: str) -> str:
+        state, out = self.next(c)
+        
+        erase = "\b \b" * len(self.composition_preview)
+        self.composition_preview = self._composition_preview_for(state)
+        
+        self.state = state
+        return erase + out + "\x1B[4m" + self.composition_preview + "\x1B[0m"
+
+    def next_on_flush(self):
         match self.state:
-            case State.SJ0:
-                self.state = State.S0
-                return "\bй"
-            case State.SJC:
-                self.state = State.S0
-                return "\bь"
-            case State.SA:
-                self.state = State.S0
-                return "\b'"
-            case State.SJA:
-                self.state = State.S0
-                return "й"
-            case _:
-                return ""
+            case State.SJ0: return (State.S0, "й")
+            case State.SJC: return (State.S0, "ь")
+            case State.SA:  return (State.S0, "'")
+            case State.SJA: return (State.S0, "'й")
+            case _: return (State.S0, "")
+            
+    def flush(self) -> str:
+        state, out = self.next_on_flush() # State should always be S0
+        
+        erase = "\b \b" * len(self.composition_preview)
+        self.composition_preview = self._composition_preview_for(state) # should always return "" 
+        
+        self.state = state
+        return erase + out + "\x1B[4m" + self.composition_preview + "\x1B[0m"
 
 def main():
     fd = sys.stdin.fileno()
