@@ -4,16 +4,16 @@ import termios
 
 from enum import Enum
 
-def is_vowel(c):
+def is_vowel(c: str):
     return c in "AaIiYyUuEeOo"
 
-def can_iotate(c):
+def can_iotate(c: str):
     return c in "AaIiUuEe"
 
-def is_iota(c):
+def is_iota(c: str):
     return c in "Jj"
 
-def is_consonant(c, include_iota=False):
+def is_consonant(c: str, include_iota=False):
     return c in "BbCcDdFfGgHhKkLlMmNnPpQqRrSsTtVvWwXxZz" or include_iota and is_iota(c)
 
 conversion_table = {
@@ -39,6 +39,9 @@ class State(Enum):
     
 # TODO: x -> кс, ch -> х
 
+class Input:
+    FLUSH = "\x00"
+
 class Transliterator:
 
     def __init__(self):
@@ -62,6 +65,7 @@ class Transliterator:
             case (State.S0 | State.SC | State.SA, "W"): return (State.SupW, "")
             case (State.S0 | State.SC | State.SA, ch) if is_consonant(ch):
                 return (State.SC, conversion_table.get(ch, ch))
+            case (State.SA, Input.FLUSH):  return (State.S0, "'")
             case (State.S0 | State.SC | State.SA, ch):
                 return (State.S0, conversion_table.get(ch, ch))
             
@@ -141,14 +145,20 @@ class Transliterator:
             case (State.SupW, ch):
                 return (State.SC, "Ш" + conversion_table.get(ch, ch))
 
+            case (State.SloJ0, Input.FLUSH): return (State.S0, "й")
+            case (State.SloJA, Input.FLUSH): return (State.S0, "'й")
             case (State.SloJ0 | State.SloJA, ch):
                 return (State.S0, "й" + conversion_table.get(ch, ch))
             case (State.SupJ0 | State.SupJA, ch):
                 return (State.S0, "Й" + conversion_table.get(ch, ch))
+            case (State.SloJC, Input.FLUSH): return (State.S0, "ь")
             case (State.SloJC, ch):
                 return (State.S0, "ь" + conversion_table.get(ch, ch))
             case (State.SupJC, ch):
                 return (State.S0, "Ь" + conversion_table.get(ch, ch))
+
+            case (_, Input.FLUSH): return (State.S0, "")
+            
 
     def _composition_preview_for(self, state: State) -> str:
         match state:
@@ -169,23 +179,9 @@ class Transliterator:
         
         self.state = state
         return erase + out + "\x1B[4m" + self.composition_preview + "\x1B[0m"
-
-    def next_on_flush(self):
-        match self.state:
-            case State.SloJ0: return (State.S0, "й")
-            case State.SloJC: return (State.S0, "ь")
-            case State.SA:  return (State.S0, "'")
-            case State.SloJA: return (State.S0, "'й")
-            case _: return (State.S0, "")
             
     def flush(self) -> str:
-        state, out = self.next_on_flush() # State should always be S0
-        
-        erase = "\b \b" * len(self.composition_preview)
-        self.composition_preview = self._composition_preview_for(state) # should always return "" 
-        
-        self.state = state
-        return erase + out + "\x1B[4m" + self.composition_preview + "\x1B[0m"
+        return self.feed(Input.FLUSH)
 
 def main():
     fd = sys.stdin.fileno()
