@@ -158,6 +158,7 @@ class Transliterator:
             case (State.SloW, "j"): return (State.SloJC, "ш")
             case (State.SloW, "J"): return (State.SupJC, "ш")
             case (State.SloW, "'"): return (State.SA, "ш")
+            case (State.SloW, Input.FLUSH): return (State.S0, "ш")
             case (State.SloW, ch):
                 return (State.SC, "ш" + conversion_table.get(ch, ch))
             
@@ -166,6 +167,7 @@ class Transliterator:
             case (State.SupW, "j"): return (State.SloJC, "Ш")
             case (State.SupW, "J"): return (State.SupJC, "Ш")
             case (State.SupW, "'"): return (State.SA, "Ш")
+            case (State.SupW, Input.FLUSH): return (State.S0, "Ш")
             case (State.SupW, ch):
                 return (State.SC, "Ш" + conversion_table.get(ch, ch))
             
@@ -174,6 +176,7 @@ class Transliterator:
             case (State.SloC, "j"): return (State.SloJC, "ц")
             case (State.SloC, "J"): return (State.SupJC, "ц")
             case (State.SloC, "'"): return (State.SA, "ц")
+            case (State.SloC, Input.FLUSH): return (State.S0, "ц")
             case (State.SloC, ch):
                 return (State.SC, "ц" + conversion_table.get(ch, ch))
             
@@ -182,6 +185,7 @@ class Transliterator:
             case (State.SupC, "j"): return (State.SloJC, "Ц")
             case (State.SupC, "J"): return (State.SupJC, "Ц")
             case (State.SupC, "'"): return (State.SA, "Ц")
+            case (State.SupC, Input.FLUSH): return (State.S0, "Ц")
             case (State.SupC, ch):
                 return (State.SC, "Ц" + conversion_table.get(ch, ch))
 
