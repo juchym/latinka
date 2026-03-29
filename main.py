@@ -1,6 +1,4 @@
 import sys
-import tty
-import termios
 
 from enum import Enum
 
@@ -229,38 +227,45 @@ class Transliterator:
     def flush(self) -> str:
         return self.feed(Input.FLUSH)
 
-def main():
-    fd = sys.stdin.fileno()
-    old_settings = termios.tcgetattr(fd)
-
-    translit = Transliterator()
-
+def getch() -> str:
     try:
-        tty.setraw(fd)
-        print("Type: \r")
-
-        while True:
+        import tty, termios
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+        try:
+            tty.setraw(fd)
             ch = sys.stdin.read(1)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        return ch
+    except ImportError:
+        import msvcrt
+        return msvcrt.getwch()
 
-            if ch == "\x03":
-                break
+def main():
+    t = Transliterator()
+    print("Type: ")
 
-            if ch == "\r":
-                sys.stdout.write(translit.flush() + "\r\n")
-                sys.stdout.flush()
-                continue
+    while True:
+        ch = getch()
 
-            if ch == "\x7F":
-                sys.stdout.write("\b \b")
-                sys.stdout.flush()
-                continue
+        if ch == "\x03":
+            break
 
-            out = translit.feed(ch)
-
-            sys.stdout.write(out)
+        if ch == "\r":
+            sys.stdout.write(t.flush() + "\r\n")
             sys.stdout.flush()
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            continue
+
+        if ch in ("\x7F", "\x08"): # \x7F on POSIX, \0x08 on NT
+            sys.stdout.write("\b \b")
+            sys.stdout.flush()
+            continue
+
+        out = t.feed(ch)
+
+        sys.stdout.write(out)
+        sys.stdout.flush()
 
 
 if __name__ == "__main__":
