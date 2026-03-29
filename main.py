@@ -1,3 +1,4 @@
+import os
 import sys
 
 from enum import Enum
@@ -228,7 +229,10 @@ class Transliterator:
         return self.feed(Input.FLUSH)
 
 def getch() -> str:
-    try:
+    if os.name == "nt":
+        import msvcrt
+        return msvcrt.getwch()
+    else:
         import tty, termios
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
@@ -238,9 +242,6 @@ def getch() -> str:
         finally:
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         return ch
-    except ImportError:
-        import msvcrt
-        return msvcrt.getwch()
 
 def main():
     t = Transliterator()
