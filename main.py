@@ -38,7 +38,7 @@ class State(Enum):
     SloC = 11 # after lowercase c
     SupC = 12 # after uppercase c
     
-# TODO: x -> кс
+# TODO: x -> кс, й after a consonant
 
 class Input:
     FLUSH = "\x00"
@@ -219,11 +219,12 @@ class Transliterator:
     def feed(self, c: str) -> str:
         state, out = self.next(c)
         
-        erase = "\b \b" * len(self.composition_preview)
+        # erase = "\b \b" * len(self.composition_preview)
         self.composition_preview = self._composition_preview_for(state)
         
         self.state = state
-        return erase + out + "\x1B[4m" + self.composition_preview + "\x1B[0m"
+        # return erase + out + "\x1B[4m" + self.composition_preview + "\x1B[0m"
+        return out
             
     def flush(self) -> str:
         return self.feed(Input.FLUSH)

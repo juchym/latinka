@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<component>
+  <name>me.euthy.udnc</name>
+  <description>IME for Ukrainian</description>
+  <exec></exec>
+  <version>0.1</version>
+  <author>Euthy</author>
+  <license>GPL</license>
+  <homepage></homepage>
+  <textdomain></textdomain>
+  <engines>
+    <engine>
+      <name>udnc</name>
+      <language>uk</language>
+      <license>GPL</license>
+      <author>Euthy</author>
+      <layout>us</layout>
+      <longname>Ukrainian (UDNC)</longname>
+      <description>Ukrainian (UDNC)</description>
+      <icon></icon>
+    </engine>
+  </engines>
+</component>
