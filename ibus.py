@@ -21,6 +21,8 @@ class UkrainianEngine(IBus.Engine):
             self._commit_pending()
             return False
         
+        # TODO: X -> (Кс, КС) can be supported by taking advantage of Ibus.ModifierType.SHIFT_MASK and IBus.ModifierType.LOCK_MASK
+        
         if keyval in (
             IBus.KEY_Return, IBus.KEY_KP_Enter,
             IBus.KEY_Escape,
@@ -40,7 +42,7 @@ class UkrainianEngine(IBus.Engine):
         
         if keyval == IBus.KEY_BackSpace:
             if self._t.composition_preview:
-                _ = self._t.flush()
+                self._t.erase()
                 self._update_preedit()
                 return True
             else:
@@ -78,7 +80,6 @@ class UkrainianEngine(IBus.Engine):
         if out:
             self._commit_text(out)
         self._update_preedit()
-        pass
         
     def _update_preedit(self) -> None:
         preview = self._t.composition_preview
@@ -94,7 +95,6 @@ class UkrainianEngine(IBus.Engine):
             self.update_preedit_text(text, cursor_pos=preview_length, visible=True)
         else:
             self.hide_preedit_text()
-        pass
 
 
 def main():
@@ -111,7 +111,7 @@ def main():
     bus.register_component(component)
     
     bus.set_global_engine_async("udnc", -1)
-    GLib.MainLoop().run()
+    GLib.MainLoop().run() # pyright: ignore[reportUnknownMemberType]
     
 
 

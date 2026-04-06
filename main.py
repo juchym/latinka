@@ -12,36 +12,41 @@ def can_iotate(c: str):
 def is_iota(c: str):
     return c in "Jj"
 
-def is_consonant(c: str, include_iota=False):
-    return c in "BbCcDdFfGgHhKkLlMmNnPpQqRrSsTtVvWwXxZz" or include_iota and is_iota(c)
+def is_consonant(c: str):
+    return c in "BbCcDdFfGgHhJjKkLlMmNnPpQqRrSsTtVvWwXxZz"
 
-conversion_table = {
+ct = { # conversion table
     "a": "а","b": "б","c": "ц","d": "д","e": "е","f": "ф","g": "ж","h": "г","i": "і","j": "й","k": "к","l": "л","m": "м",
     "n": "н","o": "о","p": "п","q": "ч","r": "р","s": "с","t": "т","u": "у","v": "в","w": "ш","x": "х","y": "и","z": "з",
 }
 
-for k, v in list(conversion_table.items()):
-    conversion_table[k.upper()] = v.upper()
+for k, v in list(ct.items()):
+    ct[k.upper()] = v.upper()
 
 class State(Enum):
     S0 = 0 # initial
     SC = 1 # after hard consonant
-    SloJ0 = 2 # after lowercase j
-    SupJ0 = 3 # after uppwercase j
+    SA = 2 # after apostrophe after hard consonant
+    SloJ0 = 3 # after lowercase j
     SloJC = 4 # after lowercase j after hard consonant
-    SupJC = 5 # after uppercase j after hard consonant
-    SA = 6 # after apostrophe after hard consonant
-    SloJA = 7 # after lowercase j after apostrophe
+    SloJA = 5 # after lowercase j after apostrophe
+    SupJ0 = 6 # after uppwercase j
+    SupJC = 7 # after uppercase j after hard consonant
     SupJA = 8 # after uppercase j after apostrophe
-    SloW = 9 # after lowercase w
-    SupW = 10 # after uppercase w
-    SloC = 11 # after lowercase c
-    SupC = 12 # after uppercase c
+    SloW0 = 9 # after lowercase w
+    SloWC = 10 # after lowercase w after hard consonant
+    SupW0 = 11 # after uppercase w
+    SupWC = 12 # after uppercase w after hard consonant
+    SloC0 = 13 # after lowercase c
+    SloCC = 14 # after lowercase c after hard consonant
+    SupC0 = 15 # after uppercase c
+    SupCC = 16 # after uppercase c after hard consonant
     
 # TODO: x -> кс, й after a consonant
 
 class Input:
-    FLUSH = "\x00"
+    NUL = "<NUL>"
+    DEL = "<DEL>"
 
 class Transliterator:
 
@@ -50,157 +55,213 @@ class Transliterator:
         self.composition_preview = ""
 
     def next(self, c: str) -> tuple[State, str]:
+        # general order: (1) NUL, (2) DEL, (3) "j", (4) "'", (5) other special cases, (6) consonants, (7) everything else
         match (self.state, c):
+            case (State.S0, Input.NUL): return (State.S0, "")
+            case (State.S0, Input.DEL): return (State.S0, "")
             case (State.S0, "j"): return (State.SloJ0, "")
             case (State.S0, "J"): return (State.SupJ0, "")
+            case (State.S0, "w"): return (State.SloW0, "")
+            case (State.S0, "W"): return (State.SupW0, "")
+            case (State.S0, "c"): return (State.SloC0, "")
+            case (State.S0, "C"): return (State.SupC0, "")
             
+            case (State.SC, Input.NUL): return (State.S0, "")
+            case (State.SC, Input.DEL): return (State.SC, "")
             case (State.SC, "j"): return (State.SloJC, "")
             case (State.SC, "J"): return (State.SupJC, "")
             case (State.SC, "'"): return (State.SA, "")
+            case (State.SC, "w"): return (State.SloWC, "")
+            case (State.SC, "W"): return (State.SupWC, "")
+            case (State.SC, "c"): return (State.SloCC, "")
+            case (State.SC, "C"): return (State.SupCC, "")
             
+            case (State.S0 | State.SC, ch) if is_consonant(ch):
+                return (State.SC, ct.get(ch, ch))
+            case (State.S0 | State.SC, ch):
+                return (State.S0, ct.get(ch, ch))
+            
+            
+            case (State.SA, Input.NUL):  return (State.S0, "'")
+            case (State.SA, Input.DEL):  return (State.SC, "")
             case (State.SA, "j"): return (State.SloJA, "")
             case (State.SA, "J"): return (State.SupJA, "")
             case (State.SA, "'"): return (State.S0, "'")
+            case (State.SA, "w"): return (State.SloW0, "'")
+            case (State.SA, "W"): return (State.SupW0, "'")
+            case (State.SA, "c"): return (State.SloC0, "'")
+            case (State.SA, "C"): return (State.SupC0, "'")
             
-            case (State.S0 | State.SC | State.SA, "w"): return (State.SloW, "")
-            case (State.S0 | State.SC | State.SA, "W"): return (State.SupW, "")
-            case (State.S0 | State.SC | State.SA, "c"): return (State.SloC, "")
-            case (State.S0 | State.SC | State.SA, "C"): return (State.SupC, "")
-            case (State.S0 | State.SC | State.SA, ch) if is_consonant(ch):
-                return (State.SC, conversion_table.get(ch, ch))
-            case (State.SA, Input.FLUSH):  return (State.S0, "'")
-            case (State.S0 | State.SC | State.SA, ch):
-                return (State.S0, conversion_table.get(ch, ch))
-            
-            case (State.SloJ0, "w"): return (State.SloW, "й")
-            case (State.SloJ0, "W"): return (State.SupW, "й")
-            case (State.SloJA, "w"): return (State.SloW, "'й")
-            case (State.SloJA, "W"): return (State.SupW, "'й")
-            case (State.SloJ0, "c"): return (State.SloC, "й")
-            case (State.SloJ0, "C"): return (State.SupC, "й")
-            case (State.SloJA, "c"): return (State.SloC, "'й")
-            case (State.SloJA, "C"): return (State.SupC, "'й")
-            case (State.SloJ0 | State.SloJA, ch) if is_consonant(ch):
-                return (State.SC, "й" + conversion_table.get(ch, ch))
-            
-            case (State.SupJ0, "w"): return (State.SloW, "Й")
-            case (State.SupJ0, "W"): return (State.SupW, "Й")
-            case (State.SupJA, "w"): return (State.SloW, "'Й")
-            case (State.SupJA, "W"): return (State.SupW, "'Й")
-            case (State.SupJ0, "c"): return (State.SloC, "Й")
-            case (State.SupJ0, "C"): return (State.SupC, "Й")
-            case (State.SupJA, "c"): return (State.SloC, "'Й")
-            case (State.SupJA, "C"): return (State.SupC, "'Й")
-            case (State.SupJ0 | State.SupJA, ch) if is_consonant(ch):
-                return (State.SC, "Й" + conversion_table.get(ch, ch))
+            case (State.SA, ch) if is_consonant(ch):
+                return (State.SC, "'" + ct.get(ch, ch))
+            case (State.SA, ch):
+                return (State.S0, "'" + ct.get(ch, ch))
             
             
-            case (State.SloJC, "w"): return (State.SloW, "ь")
-            case (State.SloJC, "W"): return (State.SupW, "ь")
-            case (State.SloJC, "c"): return (State.SloC, "ь")
-            case (State.SloJC, "C"): return (State.SupC, "ь")
-            case (State.SloJC, ch) if is_consonant(ch):
-                return (State.SC, "ь" + conversion_table.get(ch, ch))
-            
-            case (State.SupJC, "w"): return (State.SloW, "Ь")
-            case (State.SupJC, "W"): return (State.SupW, "Ь")
-            case (State.SupJC, "c"): return (State.SloC, "Ь")
-            case (State.SupJC, "C"): return (State.SupC, "Ь")
-            case (State.SupJC, ch) if is_consonant(ch):
-                return (State.SC, "Ь" + conversion_table.get(ch, ch))
-            
+            case (State.SloJ0, Input.NUL): return (State.S0, "й")
+            case (State.SloJ0, Input.DEL): return (State.S0, "")
             case (State.SloJ0, "j" | "J"): return (State.S0, "й")
-            case (State.SupJ0, "j" | "J"): return (State.S0, "Й")
-            
-            case (State.SloJC, "j" | "J"): return (State.S0, "ь")
-            case (State.SupJC, "j" | "J"): return (State.S0, "Ь")
-            
-            case (State.SloJA, "j" | "J"): return (State.S0, "'й")
-            case (State.SupJA, "j" | "J"): return (State.S0, "'Й")
-
-            case (State.SloJ0 | State.SloJC, "a" | "A"): return (State.S0, "я")
-            case (State.SupJ0 | State.SupJC, "a" | "A"): return (State.S0, "Я")
-            case (State.SloJA, "a" | "A"): return (State.S0, "'я")
-            case (State.SupJA, "a" | "A"): return (State.S0, "'Я")
-            
+            case (State.SloJ0, "'"): return (State.SA, "й")
             case (State.SloJ0, "i" | "I"): return (State.S0, "ї")
-            case (State.SupJ0, "i" | "I"): return (State.S0, "Ї")
-            case (State.SloJC | State.SloJA, "i" | "I"): return (State.S0, "'ї")
-            case (State.SupJC | State.SupJA, "i" | "I"): return (State.S0, "'Ї")
+            case (State.SloJ0, "w"): return (State.SloWC, "й")
+            case (State.SloJ0, "W"): return (State.SupWC, "й")
+            case (State.SloJ0, "c"): return (State.SloCC, "й")
+            case (State.SloJ0, "C"): return (State.SupCC, "й")
             
+            case (State.SloJC, Input.NUL): return (State.S0, "ь")
+            case (State.SloJC, Input.DEL): return (State.SC, "")
+            case (State.SloJC, "j" | "J"): return (State.S0, "ь")
+            case (State.SloJC, "'"): return (State.SA, "ь")
+            case (State.SloJC, "w"): return (State.SloW0, "ь")
+            case (State.SloJC, "W"): return (State.SupW0, "ь")
+            case (State.SloJC, "c"): return (State.SloC0, "ь")
+            case (State.SloJC, "C"): return (State.SupC0, "ь")
+            
+            case (State.SloJ0 | State.SloJC, "a" | "A"): return (State.S0, "я")
             case (State.SloJ0 | State.SloJC, "u" | "U"): return (State.S0, "ю")
-            case (State.SupJ0 | State.SupJC, "u" | "U"): return (State.S0, "Ю")
-            case (State.SloJA, "u" | "U"): return (State.S0, "'ю")
-            case (State.SupJA, "u" | "U"): return (State.S0, "'Ю")
-            
             case (State.SloJ0 | State.SloJC, "e" | "E"): return (State.S0, "є")
-            case (State.SupJ0 | State.SupJC, "e" | "E"): return (State.S0, "Є")
+            
+            case (State.SloJA, Input.NUL): return (State.S0, "'й")
+            case (State.SloJA, Input.DEL): return (State.SA, "")
+            case (State.SloJA, "j" | "J"): return (State.S0, "'й")
+            case (State.SloJA, "'"): return (State.SA, "'й")
+            case (State.SloJA, "a" | "A"): return (State.S0, "'я")
+            case (State.SloJA, "u" | "U"): return (State.S0, "'ю")
             case (State.SloJA, "e" | "E"): return (State.S0, "'є")
-            case (State.SupJA, "e" | "E"): return (State.S0, "'Є")
-
             case (State.SloJA, "o"): return (State.S0, "йо")
             case (State.SloJA, "O"): return (State.S0, "йО")
+            case (State.SloJA, "w"): return (State.SloWC, "'й")
+            case (State.SloJA, "W"): return (State.SupWC, "'й")
+            case (State.SloJA, "c"): return (State.SloCC, "'й")
+            case (State.SloJA, "C"): return (State.SupCC, "'й")
+            
+            case (State.SloJC | State.SloJA, "i" | "I"): return (State.S0, "'ї")
+            
+            case (State.SloJC, ch) if is_consonant(ch):
+                return (State.SC, "ь" + ct.get(ch, ch))
+            case (State.SloJC, ch):
+                return (State.S0, "ь" + ct.get(ch, ch))
+            
+            case (State.SloJ0 | State.SloJA, ch) if is_consonant(ch):
+                return (State.SC, "й" + ct.get(ch, ch))
+            case (State.SloJ0 | State.SloJA, ch):
+                return (State.S0, "й" + ct.get(ch, ch))
+            
+            
+            case (State.SupJ0, Input.NUL): return (State.S0, "Й")
+            case (State.SupJ0, Input.DEL): return (State.S0, "")
+            case (State.SupJ0, "j" | "J"): return (State.S0, "Й")
+            case (State.SupJ0, "'"): return (State.SA, "Й")
+            case (State.SupJ0, "i" | "I"): return (State.S0, "Ї")
+            case (State.SupJ0, "w"): return (State.SloWC, "Й")
+            case (State.SupJ0, "W"): return (State.SupWC, "Й")
+            case (State.SupJ0, "c"): return (State.SloCC, "Й")
+            case (State.SupJ0, "C"): return (State.SupCC, "Й")
+            
+            case (State.SupJC, Input.NUL): return (State.S0, "Ь")
+            case (State.SupJC, Input.DEL): return (State.SC, "")
+            case (State.SupJC, "j" | "J"): return (State.S0, "Ь")
+            case (State.SupJC, "w"): return (State.SloW0, "Ь")
+            case (State.SupJC, "W"): return (State.SupW0, "Ь")
+            case (State.SupJC, "c"): return (State.SloC0, "Ь")
+            case (State.SupJC, "C"): return (State.SupC0, "Ь")
+            
+            case (State.SupJ0 | State.SupJC, "a" | "A"): return (State.S0, "Я")
+            case (State.SupJ0 | State.SupJC, "u" | "U"): return (State.S0, "Ю")
+            case (State.SupJ0 | State.SupJC, "e" | "E"): return (State.S0, "Є")
+            
+            case (State.SupJA, Input.NUL): return (State.S0, "'Й")
+            case (State.SupJA, Input.DEL): return (State.SA, "")
+            case (State.SupJA, "j" | "J"): return (State.S0, "'Й")
+            case (State.SupJA, "'"): return (State.SA, "'Й")
+            case (State.SupJA, "a" | "A"): return (State.S0, "'Я")
+            case (State.SupJA, "u" | "U"): return (State.S0, "'Ю")
+            case (State.SupJA, "e" | "E"): return (State.S0, "'Є")
             case (State.SupJA, "o"): return (State.S0, "Йо")
             case (State.SupJA, "O"): return (State.S0, "ЙО")
+            case (State.SupJA, "w"): return (State.SloWC, "'Й")
+            case (State.SupJA, "W"): return (State.SupWC, "'Й")
+            case (State.SupJA, "c"): return (State.SloCC, "'Й")
+            case (State.SupJA, "C"): return (State.SupCC, "'Й")
             
-            case (State.SloJA, "w"): return (State.SloW, "'й")
-            case (State.SloJA, "W"): return (State.SupW, "'й")
-            case (State.SupJA, "w"): return (State.SloW, "'Й")
-            case (State.SupJA, "W"): return (State.SupW, "'Й")
-            case (State.SloJA, "c"): return (State.SloC, "'й")
-            case (State.SloJA, "C"): return (State.SupC, "'й")
-            case (State.SupJA, "c"): return (State.SloC, "'Й")
-            case (State.SupJA, "C"): return (State.SupC, "'Й")
+            case (State.SupJC | State.SupJA, "i" | "I"): return (State.S0, "'Ї")
             
-            case (State.SloW, "q" | "Q"): return (State.SC, "щ")
-            case (State.SloW, "w" | "W"): return (State.SC, "ш")
-            case (State.SloW, "j"): return (State.SloJC, "ш")
-            case (State.SloW, "J"): return (State.SupJC, "ш")
-            case (State.SloW, "'"): return (State.SA, "ш")
-            case (State.SloW, Input.FLUSH): return (State.S0, "ш")
-            case (State.SloW, ch):
-                return (State.SC, "ш" + conversion_table.get(ch, ch))
-            
-            case (State.SupW, "q" | "Q"): return (State.SC, "Щ")
-            case (State.SupW, "w" | "W"): return (State.SC, "Ш")
-            case (State.SupW, "j"): return (State.SloJC, "Ш")
-            case (State.SupW, "J"): return (State.SupJC, "Ш")
-            case (State.SupW, "'"): return (State.SA, "Ш")
-            case (State.SupW, Input.FLUSH): return (State.S0, "Ш")
-            case (State.SupW, ch):
-                return (State.SC, "Ш" + conversion_table.get(ch, ch))
-            
-            case (State.SloC, "h" | "H"): return (State.SC, "х")
-            case (State.SloC, "c" | "C"): return (State.SC, "ц")
-            case (State.SloC, "j"): return (State.SloJC, "ц")
-            case (State.SloC, "J"): return (State.SupJC, "ц")
-            case (State.SloC, "'"): return (State.SA, "ц")
-            case (State.SloC, Input.FLUSH): return (State.S0, "ц")
-            case (State.SloC, ch):
-                return (State.SC, "ц" + conversion_table.get(ch, ch))
-            
-            case (State.SupC, "h" | "H"): return (State.SC, "Х")
-            case (State.SupC, "C" | "C"): return (State.SC, "Ц")
-            case (State.SupC, "j"): return (State.SloJC, "Ц")
-            case (State.SupC, "J"): return (State.SupJC, "Ц")
-            case (State.SupC, "'"): return (State.SA, "Ц")
-            case (State.SupC, Input.FLUSH): return (State.S0, "Ц")
-            case (State.SupC, ch):
-                return (State.SC, "Ц" + conversion_table.get(ch, ch))
-
-            case (State.SloJ0, Input.FLUSH): return (State.S0, "й")
-            case (State.SloJA, Input.FLUSH): return (State.S0, "'й")
-            case (State.SloJ0 | State.SloJA, ch):
-                return (State.S0, "й" + conversion_table.get(ch, ch))
-            case (State.SupJ0 | State.SupJA, ch):
-                return (State.S0, "Й" + conversion_table.get(ch, ch))
-            case (State.SloJC, Input.FLUSH): return (State.S0, "ь")
-            case (State.SloJC, ch):
-                return (State.S0, "ь" + conversion_table.get(ch, ch))
+            case (State.SupJC, ch) if is_consonant(ch):
+                return (State.SC, "Ь" + ct.get(ch, ch))
             case (State.SupJC, ch):
-                return (State.S0, "Ь" + conversion_table.get(ch, ch))
-
-            case (_, Input.FLUSH): return (State.S0, "")
+                return (State.S0, "Ь" + ct.get(ch, ch))
+            
+            case (State.SupJ0 | State.SupJA, ch) if is_consonant(ch):
+                return (State.SC, "Й" + ct.get(ch, ch))
+            case (State.SupJ0 | State.SupJA, ch):
+                return (State.S0, "Й" + ct.get(ch, ch))
+            
+            
+            case (State.SloW0 | State.SloWC, Input.NUL): return (State.S0, "ш")
+            
+            case (State.SloW0, Input.DEL): return (State.S0, "")
+            case (State.SloWC, Input.DEL): return (State.SC, "")
+            
+            case (State.SloW0 | State.SloWC, "j"): return (State.SloJC, "ш")
+            case (State.SloW0 | State.SloWC, "J"): return (State.SupJC, "ш")
+            case (State.SloW0 | State.SloWC, "'"): return (State.SA, "ш")
+            case (State.SloW0 | State.SloWC, "q" | "Q"): return (State.SC, "щ")
+            case (State.SloW0 | State.SloWC, "w" | "W"): return (State.SC, "ш")
+            
+            case (State.SloW0 | State.SloWC, ch) if is_consonant(ch):
+                return (State.SC, "ш" + ct.get(ch, ch))
+            case (State.SloW0 | State.SloWC, ch):
+                return (State.S0, "ш" + ct.get(ch, ch))
+            
+            
+            case (State.SupW0 | State.SupWC, Input.NUL): return (State.S0, "Ш")
+            
+            case (State.SupW0, Input.DEL): return (State.S0, "")
+            case (State.SupWC, Input.DEL): return (State.SC, "")
+            
+            case (State.SupW0 | State.SupWC, "j"): return (State.SloJC, "Ш")
+            case (State.SupW0 | State.SupWC, "J"): return (State.SupJC, "Ш")
+            case (State.SupW0 | State.SupWC, "'"): return (State.SA, "Ш")
+            case (State.SupW0 | State.SupWC, "q" | "Q"): return (State.SC, "Щ")
+            case (State.SupW0 | State.SupWC, "w" | "W"): return (State.SC, "Ш")
+            case (State.SupW0 | State.SupWC, ch) if is_consonant(ch):
+                return (State.SC, "Ш" + ct.get(ch, ch))
+            case (State.SupW0 | State.SupWC, ch):
+                return (State.S0, "Ш" + ct.get(ch, ch))
+            
+            
+            case (State.SloC0 | State.SloCC, Input.NUL): return (State.S0, "ц")
+            
+            case (State.SloC0, Input.DEL): return (State.S0, "")
+            case (State.SloCC, Input.DEL): return (State.SC, "")
+            
+            case (State.SloC0 | State.SloCC, "j"): return (State.SloJC, "ц")
+            case (State.SloC0 | State.SloCC, "J"): return (State.SupJC, "ц")
+            case (State.SloC0 | State.SloCC, "'"): return (State.SA, "ц")
+            case (State.SloC0 | State.SloCC, "h" | "H"): return (State.SC, "х")
+            case (State.SloC0 | State.SloCC, "c" | "C"): return (State.SC, "ц")
+            
+            case (State.SloC0 | State.SloCC, ch) if is_consonant(ch):
+                return (State.SC, "ц" + ct.get(ch, ch))
+            case (State.SloC0 | State.SloCC, ch):
+                return (State.S0, "ц" + ct.get(ch, ch))
+            
+            
+            case (State.SupC0 | State.SupCC, Input.NUL): return (State.S0, "Ц")
+            
+            case (State.SupC0, Input.DEL): return (State.S0, "")
+            case (State.SupCC, Input.DEL): return (State.SC, "")
+            
+            case (State.SupC0 | State.SupCC, "j"): return (State.SloJC, "Ц")
+            case (State.SupC0 | State.SupCC, "J"): return (State.SupJC, "Ц")
+            case (State.SupC0 | State.SupCC, "'"): return (State.SA, "Ц")
+            case (State.SupC0 | State.SupCC, "h" | "H"): return (State.SC, "Х")
+            case (State.SupC0 | State.SupCC, "C" | "C"): return (State.SC, "Ц")
+            
+            case (State.SupC0 | State.SupCC, ch) if is_consonant(ch):
+                return (State.SC, "Ц" + ct.get(ch, ch))
+            case (State.SupC0 | State.SupCC, ch):
+                return (State.S0, "Ц" + ct.get(ch, ch))
             
 
     def _composition_preview_for(self, state: State) -> str:
@@ -210,10 +271,10 @@ class Transliterator:
             case State.SA: return "'"
             case State.SloJA: return "'ј"
             case State.SupJA: return "'Ј"
-            case State.SloW: return "ш"
-            case State.SupW: return "Ш"
-            case State.SloC: return "ц"
-            case State.SupC: return "Ц"
+            case State.SloW0 | State.SloWC: return "ш"
+            case State.SupW0 | State.SupWC: return "Ш"
+            case State.SloC0 | State.SloCC: return "ц"
+            case State.SupC0 | State.SupCC: return "Ц"
             case _: return ""
 
     def feed(self, c: str) -> str:
@@ -227,7 +288,11 @@ class Transliterator:
         return out
             
     def flush(self) -> str:
-        return self.feed(Input.FLUSH)
+        return self.feed(Input.NUL)
+    
+    def erase(self) -> str:
+        return self.feed(Input.DEL)
+    
 
 def getch() -> str:
     if os.name == "nt":
@@ -260,6 +325,7 @@ def main():
             continue
 
         if ch in ("\x7F", "\x08"): # \x7F on POSIX, \0x08 on NT
+            t.erase()
             sys.stdout.write("\b \b")
             sys.stdout.flush()
             continue
