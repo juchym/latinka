@@ -1,0 +1,92 @@
+# Russian. Columns: ctx latin cyrillic cost (see rules.py).
+# Mirrors uk.rules: same consonants and j-softening.
+
+# --- native letters ---
+*   a    а   0
+*   b    б   0
+*   c    ц   0
+*   d    д   0
+C   e    е   0
+!C  e    э   0   # это, поэт
+*   f    ф   0
+*   g    г   0   # ж is ž (zx)
+*   h    г   0
+*   i    и   0
+*   k    к   0
+*   l    л   0
+*   m    м   0
+*   n    н   0
+*   o    о   0
+*   p    п   0
+*   q    к   0   # Latin q; ч is č (cx)
+*   r    р   0
+*   s    с   0
+*   t    т   0
+*   u    у   0
+*   v    в   0
+*   w    в   0   # as in Polish and German; ш is š (sx)
+*   x    кс  0   # x is always кс; х is ch
+*   y    ы   0
+*   z    з   0
+
+# --- háček letters (typed with x after c, s, z: cx → č; stx → šť; or a tap of AltGr) ---
+*   č    ч   0
+*   š    ш   0
+*   ž    ж   0
+*   šč   щ   0
+*   šč   шч  1   # батюшчин
+*   šť   щ   0   # stx → šť: щастя: šťastja
+
+# --- native digraphs ---
+*   ch   х   0
+
+# j: soft sign after a consonant, й otherwise; iotated vowels
+C   j    ь   0
+!C  j    й   0
+*   ja   я   0
+*   ju   ю   0
+*   je   е   0   # есть: jestj
+*   jo   ё   0
+C   ji   ьи  0   # соловьи
+
+# apostrophe: hard sign after a consonant
+!C  '    '   0
+C   '    ъ   0   # подъезд: pod'jezd
+
+# --- alternatives the lexicon decides on ---
+!C  e    е   1
+C   e    э   1   # мэр
+C   ja   ья  1   # статья
+C   ju   ью  1
+C   je   ье  1   # платье
+C   jo   ьё  1
+
+# --- Greco-Latin vocabulary (the regular correspondences of international words) ---
+*   ph   ф   1   # фотография: photographia
+*   th   т   1   # теория: theoria
+*   th   ф   1   # орфография: orthographia
+*   rh   р   1   # ритм: rhythm
+*   au   ав  1   # автомобиль: automobil
+*   eu   ев  1   # Европа: Europa
+*   eu   ей  1   # нейрон: neuron
+*   ia   ия  1   # теория: theoria
+*   iu   ию  1
+*   ti   ци  1   # Latin -tio: революционный: revolutionnyj
+*   tia  ция 1   # нация, революция: natia, revolutia (партия, демократия stay via ia)
+*   tii  ции 1
+*   tie  цие 1
+*   tiu  цию 1
+*   lu   лю  1   # революция, абсолютный, иллюзия: revolutia, absolutnyj
+*   llu  ллю 1   # иллюстрация: illustratia
+*   qu   кв  1   # квадрат: quadrat
+*   h    х   1   # хаос: chaos
+*   c    к   1   # клиент, культура: client, cultura
+*   ch   к   1   # оркестр: orchestr
+*   y    и   1   # система: systema
+аеёиоуыэюяАЕЁИОУЫЭЮЯ  s/V  з  1   # музыка: musyka (between vowels)
+аеёиоуыэюяАЕЁИОУЫЭЮЯ  sm   зм 1   # оптимизм, плазма: optimism, plasma
+аеёиоуыэюяАЕЁИОУЫЭЮЯ  sr   зр 1   # Израиль
+*   l    ль  1   # фильм, культура: film, cultura
+
+# Words borrowed from living languages (bureau, chauffeur, Tiananmen) aren't
+# rules: they are listed in ru.loans.

@@ -1,0 +1,75 @@
+# Words from living languages, written in their source spelling.
+# One `latin cyrillic` per line. An entry also matches inside a longer word,
+# so endings and compounds work: chauffeurom → шофером, nacguardia → нацгвардія.
+# Write lemmas; the stem for endings is derived by dropping trailing vowels
+# from both sides (service сервіс → servicu сервісу, brigade бригада → brigady).
+
+# French
+atelier     ательє
+bureau      бюро
+budget      бюджет
+million     мільйон
+battalion   батальйон
+dossier     досьє
+portier     портьє
+cognac      коньяк
+bouquet     букет
+debut       дебют
+chauffeur   шофер
+restaurant  ресторан
+croissant   круасан
+cabaret     кабаре
+trottoir    тротуар
+parfum      парфум
+Bordeaux    Бордо
+guardia     гвардія
+service     сервіс
+toilette    туалет
+limonade    лимонад
+brigade     бригада
+machine     машина
+
+# German
+blitzkrieg  бліцкриг
+Volkswagen  Фольксваген
+Zeitnot     цейтнот
+Einstein    Ейнштейн
+schnapps    шнапс
+Spritze     шприц
+
+# English
+football    футбол
+volleyball  волейбол
+meeting     мітинг
+weekend     вікенд
+jockey      жокей
+hockey      хокей
+leader      лідер
+jazz        джаз
+show        шоу
+idea        ідея
+
+# Spanish, Italian
+guitarra    гітара
+Guevara     Гевара
+Guatemala   Гватемала
+
+# Extra candidates (`+`): offered right after the usual first candidate
++he         хє
+
+# Chinese (Pinyin)
+Tiananmen   Тяньаньмень
+Xi          Сі
+Jinping     Цзіньпін
+Mao         Мао
+Zedong      Цзедун
+Guangzhou   Гуанчжоу
+Shenzhen    Шеньчжень
+Shanghai    Шанхай
+Beijing     Пекін
+wushu       ушу
+yin         інь
+yang        ян
+fengshui    феншуй
+qigong      цигун
+kungfu      кунфу

@@ -1,0 +1,137 @@
+# Ukrainian. Columns: ctx latin cyrillic cost (see rules.py).
+# Input is matched lowercased; case is reapplied from the Latin letters.
+
+# --- native letters ---
+*   a    а   0
+*   b    б   0
+*   c    ц   0
+*   d    д   0
+*   e    е   0
+*   f    ф   0
+*   g    ґ   0   # as in Czech; ж is ž (zx)
+*   h    г   0
+*   i    і   0
+аеєиіїоуюяАЕЄИІЇОУЮЯ  i  ї  0   # і after a vowel is ї: країна, мозаїка, альтруїзм: kraina, mosaica, altruism
+аеєиіїоуюяАЕЄИІЇОУЮЯ  i  і  1   # except across a prefix: поінформувати, проігнорувати
+*   k    к   0
+*   l    л   0
+*   m    м   0
+*   n    н   0
+*   o    о   0
+*   p    п   0
+*   q    к   0   # Latin q; ч is č (cx)
+*   r    р   0
+*   s    с   0
+*   t    т   0
+*   u    у   0
+*   v    в   0
+*   w    в   0   # as in Polish and German; ш is š (sx)
+*   x    кс  0   # x is always кс; х is ch
+*   y    и   0
+*   z    з   0
+
+# --- háček letters (typed with x after c, s, z: cx → č; stx → šť; or a tap of AltGr) ---
+*   č    ч   0
+*   š    ш   0
+*   ž    ж   0
+*   šč   щ   0
+*   šč   шч  1   # батюшчин
+*   šť   щ   0   # stx → šť: щастя: šťastja
+
+# --- native digraphs ---
+*   ch   х   0
+
+# j: soft sign after a consonant, й otherwise; iotated vowels
+C   j    ь   0
+!C  j    й   0
+*   ja   я   0
+*   ju   ю   0
+*   je   є   0
+C   ji   'ї  0   # під'їзд
+!C  ji   ї   0
+
+# apostrophe after labials: п'ять, м'ясо, комп'ютер
+бпвмфБПВМФ  ja  'я  0
+бпвмфБПВМФ  ju  'ю  0
+бпвмфБПВМФ  je  'є  0
+бпвмфБПВМФ  ja  я   1   # свято, цвях: labial after a consonant
+бпвмфБПВМФ  ju  ю   1
+бпвмфБПВМФ  je  є   1
+# After other consonants the apostrophe depends on morphology and etymology,
+# so it's an alternative the lexicon decides on (natively буря, моря, рясний):
+C   ja   'я  1   # бур'ян, з'ясувати, к'янті, миш'як
+C   ju   'ю  1   # роз'юшений
+C   je   'є  1   # від'єднати, кар'єра
+C   jo   йо  1   # Воробйов, Соловйов (natively сьогодні, льон)
+
+# Splits the whole word resolves, so no escapes are needed:
+!C  ja   йа  1   # найактивніший: najaktyvniwyj
+!C  ju   йу  1   # найулюбленіший: najuljubleniwyj
+!C  je   йе  1   # найефективніший: najefektyvniwyj
+C   ja   ьа  1   # мальабсорбція
+C   ju   ью  1   # Ньютон, лазанью: Njuton
+C   je   ье  1   # бельетаж
+*   ch   цг  1   # нацгвардія, спецгрупа: nachvardija, spechrupa
+
+# apostrophe
+*   '    '   0
+C   'jo  йо  0
+ьЬ  'jo  йо  0   # мільйон: milj'jon
+
+# --- Greco-Latin vocabulary (the regular correspondences of international words) ---
+*   ph   ф   1   # фотографія: photographia
+*   th   т   1   # теорія: theoria
+*   th   ф   1   # орфографія: orthographia
+*   rh   р   1   # ритм: rhythm
+*   au   ав  1   # автомобіль: automobil
+*   eu   єв  1   # Європа: Europa
+*   eu   ей  1   # нейрон: neuron
+*   eu   ев  1   # пневмонія: pneumonia
+*   ia   ія  1   # теорія: theoria
+*   ie   іє  1   # дієта: dieta
+*   iu   ію  1
+*   ii   ії  1   # фотографії: photographii
+*   ti   ці  1   # Latin -tio: революційний, націю: revolutijnyj, natiju
+*   tia  ція 1   # нація, революція: natia, revolutia (партія, демократія stay via ia)
+*   tii  ції 1
+*   tie  ціє 1
+*   tiu  цію 1
+*   lu   лю  1   # революція, абсолютний, ілюзія: revolutia, absolutnyj, iluzia
+*   llu  лю  1   # ілюстрація: illustratia
+*   qu   кв  1   # квадрат: quadrat
+*   g    г   1   # галактика: galaktyka
+*   h    х   1   # хаос: chaos
+*   c    к   1   # клієнт, культура: client, cultura
+*   ch   к   1   # оркестр: orchestr
+*   y    і   1   # фізика: physyka
+аеєиіїоуюяАЕЄИІЇОУЮЯ  s/V  з  1   # музика, фізика: muzyka, physyka (between vowels)
+аеєиіїоуюяАЕЄИІЇОУЮЯ  sm   зм 1   # оптимізм, плазма, маразм: optimism, plasma (космос stays via the lexicon)
+аеєиіїоуюяАЕЄИІЇОУЮЯ  sr   зр 1   # Ізраїль
+*   l    ль  1   # фільм, культура: film, cultura
+*   ss   с   1   # Latin double consonants are single in Ukrainian
+*   ll   л   1
+*   mm   м   1
+*   pp   п   1
+*   tt   т   1
+*   rr   р   1
+*   ff   ф   1
+
+# --- etymological spelling ---
+*   i    и   1   # the и from Proto-Slavic i: бити, ходити: biti, choditi
+
+# infinitive endings: choditi -> ходити
+*   ti$    ти   inf
+*   tisja$ тися inf
+*   tisj$  тись inf
+
+# syllabic l and r (Proto-Slavic *TъlT, *TrъT)
+C   l/C  ов  1   # вовк, повний: vlk, plny (only before a consonant)
+C   lv   ов  1   # мовити: mlviti
+C   l/C  ли  1   # глитати: hltati
+C   r/C  ри  1   # кривавий, гриміти: krvavy, hrmiti
+C   r/C  ро  1   # кров: krv
+C   r/C  ер  1   # шерсть: šrst
+*   ol/C ов  1   # ковдра: koldra
+
+# Words borrowed from living languages (bureau, chauffeur, Tiananmen) aren't
+# rules: they are listed in uk.loans.
