@@ -14,7 +14,16 @@ A rule table (data/<lang>.rules) lists rows of `ctx latin cyrillic cost`:
   cyrillic  the output; `-` for none (French silent letters).
   cost  0 for native rules, >= 1 for alternatives (loanwords etc.), or `inf`
         for an infinitive ending (choditi): an alternative that beats the
-        native reading when it produces an infinitive.
+        native reading when it produces an infinitive. A cost ending in `*`
+        (`1*`) marks a strong alternative, one the native reading almost never
+        means (ph → ф, not пг): strong alternatives also build a guess reading,
+        offered even when it isn't a known word (phridon → фрідон). A cost
+        ending in `+name` (`1+soft`) puts the rule in a variant group: every
+        place where one of its rules can apply gets one more reading, with only
+        that place changed, offered after the real words even when it isn't a
+        known word. They're ordered by group (in the order the groups first
+        appear in the table), then left to right (tjanjanjmenj → тяняньмень,
+        then т'яняньмень, тян'яньмень, тьаняньмень, тяньаньмень).
 
 Native rules are applied deterministically with longest match. Alternatives
 are only explored by `readings()`, which keeps paths whose output is a real
@@ -58,6 +67,8 @@ class Rule:
     infinitive: bool = False  # cost `inf`: an infinitive ending
     loan: bool = False  # an entry of the loanword list
     loan_rank: int = 0  # position of this form on its loanword list line
+    strong: bool = False  # cost `1*`: also used for the guess reading
+    variant: str = ""  # cost `1+name`: builds the variant reading of its group
     upturn: bool = False  # the ґ twin of a rule reading Latin g as г
 
     @property
@@ -101,6 +112,15 @@ class Edge:
     loan: bool = False
     loan_rank: int = 0
     upturn: bool = False
+    reads_g: bool = False  # the rule reads a Latin g
+
+    @property
+    def g_letter(self) -> str:
+        """How this edge reads Latin g: "ґ", "г", or "" when it reads no g."""
+        if not self.reads_g:
+            return ""
+        lower = self.output.lower()
+        return "ґ" if "ґ" in lower else "г" if "г" in lower else ""
 
     @property
     def plain(self) -> str:
@@ -138,8 +158,10 @@ class RuleTable:
             if len(fields) != 4:
                 raise ValueError(f"{path}:{lineno}: expected `ctx latin cyrillic cost`")
             ctx, latin, cyrillic, cost = fields
-            infinitive = cost == "inf"
-            rules.append(Rule(ctx, latin, "" if cyrillic == "-" else cyrillic, 1 if infinitive else int(cost), infinitive))
+            cost, _, variant = cost.partition("+")
+            infinitive, strong = cost == "inf", cost.endswith("*")
+            rules.append(Rule(ctx, latin, "" if cyrillic == "-" else cyrillic,
+                              1 if infinitive else int(cost.rstrip("*")), infinitive, strong=strong, variant=variant))
         entries: dict[str, list[str]] = {}
         extras: dict[str, list[str]] = {}
         for loan_path in loans:
@@ -166,8 +188,8 @@ class RuleTable:
                 if stem != latin and len(stem) >= MIN_LOAN_IN_WORD and f"{stem}/+" not in entries:
                     rules.append(Rule("*", f"{stem}/+", cyrillic_stem, 1, loan=True, loan_rank=rank))
         # The ґ twin of every alternative reading Latin g as г.
-        rules += [Rule(r.ctx, r.latin, r.cyrillic.replace("г", "ґ").replace("Г", "Ґ"), r.cost, r.infinitive,
-                       r.loan, r.loan_rank, True)
+        rules += [Rule(r.ctx, r.latin, r.cyrillic.replace("г", "ґ").replace("Г", "Ґ"), r.cost,
+                       infinitive=r.infinitive, loan=r.loan, loan_rank=r.loan_rank, upturn=True)
                   for r in rules if r.cost > 0 and "g" in r.key and "г" in r.cyrillic.lower()]
         return cls(rules, extras)
 
@@ -184,7 +206,8 @@ class RuleTable:
     def native_edge(self, word: str, i: int, prev: str, all_caps: bool) -> Edge:
         for r in self._matching(word, i, prev):
             if r.cost == 0:
-                return Edge(len(r.key), _apply_case(r.cyrillic, word[i:i + len(r.key)], all_caps), 0)
+                return Edge(len(r.key), _apply_case(r.cyrillic, word[i:i + len(r.key)], all_caps), 0,
+                            reads_g="g" in r.key)
         return Edge(1, word[i], 0)  # no rule: pass through
 
     def edges(self, word: str, i: int, prev: str, all_caps: bool) -> list[Edge]:
@@ -193,7 +216,7 @@ class RuleTable:
         for r in self._matching(word, i, prev):
             if r.cost > 0:
                 edges.append(Edge(len(r.key), _apply_case(r.cyrillic, word[i:i + len(r.key)], all_caps), r.cost,
-                                  r.infinitive, r.loan, r.loan_rank, r.upturn))
+                                  r.infinitive, r.loan, r.loan_rank, r.upturn, "g" in r.key))
         return edges
 
     def native(self, word: str, prev: str = "") -> str:
@@ -205,6 +228,38 @@ class RuleTable:
             i += e.length
         return out
 
+    def guess(self, word: str, prev: str = "", choice: tuple[int, str] | None = None) -> str:
+        """The native reading with strong alternatives applied (phridon → фрідон), longest match first.
+
+        `choice` is (position, group): also apply that variant group's rule at that one Latin position.
+        """
+        return self._guess(word, prev, choice)[0]
+
+    def split_points(self, word: str, prev: str = "") -> list[tuple[int, str]]:
+        """The places along the guess where a variant group's rule can apply, as (position, group)."""
+        return self._guess(word, prev, None)[1]
+
+    def _guess(self, word: str, prev: str, choice: tuple[int, str] | None) -> tuple[str, list[tuple[int, str]]]:
+        all_caps = _is_all_caps(word)
+        out, i, points = "", 0, []
+        while i < len(word):
+            prev_char = out[-1:] or prev
+            matching = list(self._matching(word, i, prev_char))
+            native = self.native_edge(word, i, prev_char, all_caps)
+            for group in dict.fromkeys(r.variant for r in matching if r.variant and len(r.key) >= native.length):
+                points.append((i, group))
+            if choice and choice[0] == i:
+                rule = next((r for r in matching if r.variant == choice[1]), None)
+            else:
+                rule = next((r for r in matching if r.strong), None)
+            if rule and len(rule.key) >= native.length:
+                out += _apply_case(rule.cyrillic, word[i:i + len(rule.key)], all_caps)
+                i += len(rule.key)
+            else:
+                out += native.output
+                i += native.length
+        return out, points
+
     def readings(self, word: str, lexicon: Lexicon, prev: str = "", limit: int = 9, max_cost: int = 8) -> list[str]:
         """Readings of `word`, best first, then the native reading.
 
@@ -215,17 +270,17 @@ class RuleTable:
         alternative rule used costs one point, and frequency earns
         ln(frequency + 1) back. A word that is exactly a loanword list entry
         counts even if the lexicon doesn't know it; several forms listed for it
-        come in their listed order. Proper nouns and
-        abbreviations typed in lowercase are only offered after the native
-        reading, capitalized, so they never replace an ordinary word.
+        come in their listed order. Proper nouns and capitalized abbreviations
+        only count when the word is typed with a capital.
         """
         all_caps = _is_all_caps(word)
         capitalized = word[:1].isupper()
         found: dict[str, tuple[bool, bool, int, float]] = {}
-        names: dict[str, tuple[bool, int, float]] = {}  # proper nouns typed in lowercase
 
-        def walk(i: int, out: str, plain: str, cost: int, infinitive: bool, loan: bool, whole_rank: int) -> None:
+        def walk(i: int, out: str, plain: str, cost: int, infinitive: bool, loan: bool, whole_rank: int,
+                 g: str) -> None:
             # `plain` is `out` with ґ twins read as г: the form looked up in the lexicon.
+            # `g` is how this path reads Latin g so far: every g in a word reads the same, г or ґ.
             upturned = 0.001 if out != plain else 0  # a ґ twin comes right after its г reading
             if i == len(word):
                 if whole_rank >= 0:  # exactly a listed word: beats stems and compounds, in listed order
@@ -244,27 +299,43 @@ class RuleTable:
                     tier = 1 if cost == 0 else 2
                 score = cost - math.log(freq + 1) + upturned
                 if proper and not capitalized:
-                    name = out[:1].upper() + out[1:]
-                    key = (variant, tier, score)
-                    names[name] = min(key, names.get(name, key))
-                else:
-                    key = (proper, variant, tier, score)
-                    found[out] = min(key, found.get(out, key))
+                    return  # names need a capital: typing in lowercase never offers them
+                key = (proper, variant, tier, score)
+                found[out] = min(key, found.get(out, key))
                 return
             for e in self.edges(word, i, out[-1:] or prev, all_caps):
-                if cost + e.cost > max_cost:
+                if cost + e.cost > max_cost or (g and e.g_letter and e.g_letter != g):
                     continue
                 nxt, nxt_plain = out + e.output, plain + e.plain
                 if e.loan or lexicon.has_prefix(nxt_plain.lower()):
                     walk(i + e.length, nxt, nxt_plain, cost + e.cost, infinitive or e.infinitive, loan or e.loan,
-                         e.loan_rank if e.loan and i == 0 and e.length == len(word) else -1)
+                         e.loan_rank if e.loan and i == 0 and e.length == len(word) else -1, g or e.g_letter)
 
-        walk(0, "", "", 0, False, False, -1)
-        ranked = sorted(found, key=found.__getitem__)
+        walk(0, "", "", 0, False, False, -1, "")
         native = self.native(word, prev)
-        if native not in found:
+        # A single letter is always a real thing to type (an initial, a letter name), so a native
+        # one-letter reading counts as a word: ch → х before кг, g → ґ before г.
+        if len(native) == 1 and native.isalpha():
+            key = (False, False, 1, 0.0)
+            found[native] = min(key, found.get(native, key))
+        ranked = sorted(found, key=found.__getitem__)
+        # A guess with strong alternatives (phridon → фрідон) comes before the plain native reading.
+        # After them, each place a split can happen gets its own variants, one place at a time
+        # (tjanjanjmenj: т'яняньмень, тьаняньмень, тян'яньмень, тяньаньмень). They're offered even
+        # when the native reading is a word: the typed text may be only part of a longer word (tja: тя,
+        # then т'я, тьа).
+        guess = self.guess(word, prev)
+        if guess not in ranked:
+            ranked.append(guess)
+        if native not in ranked:
             ranked.append(native)
-        ranked += sorted((n for n in names if n not in found), key=names.__getitem__)
+        # Variants by type (in the order the groups first appear in the table, the most common
+        # first), then left to right.
+        rank = {group: k for k, group in enumerate(dict.fromkeys(r.variant for r in self.rules if r.variant))}
+        for choice in sorted(self.split_points(word, prev), key=lambda c: (rank[c[1]], c[0])):
+            variant = self.guess(word, prev, choice)
+            if variant not in ranked:
+                ranked.append(variant)
         for k, form in enumerate(self.extras.get(word.lower(), ()), 1):
             form = _apply_case(form, word, all_caps)
             if form in ranked:

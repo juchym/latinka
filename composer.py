@@ -74,6 +74,7 @@ class Composer:
         self._buf = ""
         self._cursor = 0  # position in the buffer, in characters
         self._prev = ""
+        self._prev_known = True
         self._candidates: list[str] | None = None
         self._latin = False  # Latin mode: the last word was committed as Latin, so Latin comes first
 
@@ -82,9 +83,11 @@ class Composer:
         # Loaded on first use, so starting the IME stays fast.
         return self._lexicon_override if self._lexicon_override is not None else _lexicon(self._lang)
 
-    def set_context(self, prev: str) -> None:
-        """The character before the word (from surrounding text), if known."""
+    def set_context(self, prev: str, known: bool = True) -> None:
+        """The character before the word ("" at the start of the text). `known` is False when the
+        front end can't tell (e.g. the cursor moved in an app that doesn't report surrounding text)."""
         self._prev = prev[-1:]
+        self._prev_known = known
         self._candidates = None
 
     def push(self, ch: str) -> None:
@@ -163,13 +166,31 @@ class Composer:
             # A word starting with j may continue existing text: offer the native reading for the
             # other context too, й after a consonant or ь otherwise (jsja: йся, ься).
             # When the best reading is a word and the other isn't (jogo: його), the other goes last.
+            # The context and the dictionary only change its place, never whether it's offered: when
+            # the two differ only by an apostrophe and the context is known (ji: ї, then 'ї), it goes
+            # last; when the context is unknown (jizd after the cursor moved), it comes second.
+            # The same goes for the variants at that first j in the other context (jakist: 'якість,
+            # ьакість), so ja, ju, je behave like ji (їзд, 'їзд).
             if self._buf[:1] in ("j", "J"):
-                other = table.native(self._buf, "" if is_cyrillic_consonant(self._prev) else "н")
-                if other not in readings:
-                    if self._lexicon.entry(readings[0].lower()) and not self._lexicon.entry(other.lower()):
-                        readings.append(other)
+                other_prev = "" if is_cyrillic_consonant(self._prev) else "н"
+                other = table.native(self._buf, other_prev)
+                usual = table.native(self._buf, self._prev)
+                apostrophe_only = other.lstrip("'") == usual.lstrip("'")
+                at_first_j = [table.guess(self._buf, other_prev, choice)
+                              for choice in table.split_points(self._buf, other_prev) if choice[0] == 0]
+                second = 1
+                for k, form in enumerate([other] + at_first_j):
+                    if form in readings:
+                        continue
+                    if not self._prev_known:
+                        readings.insert(second, form)
+                        second += 1
+                    elif k > 0 or apostrophe_only or (self._lexicon.entry(readings[0].lower())
+                                                      and not self._lexicon.entry(form.lower())):
+                        readings.append(form)
                     else:
-                        readings.insert(1, other)
+                        readings.insert(second, form)
+                        second += 1
             # Single letters go right after the first reading, before one-letter names.
             letters = [l.upper() if self._buf.isupper() else l for l in SINGLE_LETTERS.get(self._buf.lower(), ())]
             for k, letter in enumerate((l for l in letters if l != readings[0]), 1):

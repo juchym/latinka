@@ -113,7 +113,12 @@ public:
     bool ok() const { return static_cast<bool>(c_); }
     bool empty() { return raw().empty(); }
     std::string raw() { return callStr(c_.p, "raw"); }
-    void setContext(const std::string &prev) { callVoid(c_.p, "set_context", prev.c_str()); }
+    void setContext(const std::string &prev, bool known) {
+        PyRef r(PyObject_CallMethod(c_.p, "set_context", "si", prev.c_str(), known ? 1 : 0));
+        if (!r) {
+            PyErr_Print();
+        }
+    }
     void push(const std::string &ch) { callVoid(c_.p, "push", ch.c_str()); selected = 0; }
     void pop() { callVoid(c_.p, "pop"); selected = 0; }
     void del() { callVoid(c_.p, "delete"); selected = 0; }
@@ -149,7 +154,8 @@ public:
     }
 
     Word *current = nullptr; // the word of the active input method
-    std::string last;        // last character typed or committed, if known
+    std::string last;        // last character typed or committed
+    bool lastKnown = true;   // false once the cursor may have moved (arrows, Delete, a click)
     bool altGrTap = false;   // AltGr pressed while composing, with no other key since
 
 private:
@@ -186,8 +192,10 @@ public:
 
     void keyEvent(const fcitx::InputMethodEntry &entry, fcitx::KeyEvent &event) override {
         auto *ic = event.inputContext();
-        // Password and other sensitive fields: type straight through, never show or convert.
-        if (ic->capabilityFlags().testAny(fcitx::CapabilityFlags{fcitx::CapabilityFlag::PasswordOrSensitive})) {
+        // Password fields, and fields asking for raw keyboard input: type straight through, never
+        // show or convert. Sensitive fields (incognito windows) still work: nothing typed is ever stored.
+        if (ic->capabilityFlags().testAny(
+                fcitx::CapabilityFlags{fcitx::CapabilityFlag::Password, fcitx::CapabilityFlag::Disable})) {
             return;
         }
         // A tap of AltGr (or right Alt) after c, s, z or st works like the háček key: s + tap → š.
@@ -230,10 +238,30 @@ public:
             return;
         }
 
+        // AltGr held with s, c or z types š, č, ž (Shift for capitals): the letter, then hush().
+        // AltGr is Mod5, which only the raw key keeps (event.key() is normalized without it).
+        if (event.rawKey().states().test(fcitx::KeyState::Mod5) &&
+            !key.states().testAny(fcitx::KeyStates{fcitx::KeyState::Ctrl, fcitx::KeyState::Alt})) {
+            uint32_t base = fcitx::Key::keySymToUnicode(key.sym());
+            if (base == 's' || base == 'c' || base == 'z' || base == 'S' || base == 'C' || base == 'Z') {
+                if (word.empty()) {
+                    auto [prev, known] = contextBefore(ic, state);
+                    word.setContext(prev, known);
+                }
+                bool upper = key.states().test(fcitx::KeyState::Shift) || (base >= 'A' && base <= 'Z');
+                word.push(std::string(1, static_cast<char>(upper ? std::toupper(base) : std::tolower(base))));
+                word.hush();
+                updateUI(ic, word);
+                event.filterAndAccept();
+                return;
+            }
+        }
+
         if (key.states().testAny(fcitx::KeyStates{fcitx::KeyState::Ctrl, fcitx::KeyState::Alt,
                                                   fcitx::KeyState::Super})) {
             commitSelected(ic, word);
             state->last.clear();
+            state->lastKnown = false; // a shortcut may have moved the cursor or changed the text
             return;
         }
 
@@ -298,7 +326,8 @@ public:
         }
         if (wordChar && !key.states().testAny(fcitx::KeyStates{fcitx::KeyState::Ctrl})) {
             if (word.empty()) {
-                word.setContext(contextBefore(ic, state));
+                auto [prev, known] = contextBefore(ic, state);
+                word.setContext(prev, known);
             }
             word.push(fcitx::utf8::UCS4ToUTF8(ucs));
             updateUI(ic, word);
@@ -308,7 +337,16 @@ public:
 
         // A word boundary: commit, then let the key through.
         commitSelected(ic, word);
-        state->last = (ucs >= 0x20 && ucs != 0x7f) ? fcitx::utf8::UCS4ToUTF8(ucs) : "";
+        if (ucs >= 0x20 && ucs != 0x7f) {
+            state->last = fcitx::utf8::UCS4ToUTF8(ucs);
+            state->lastKnown = true;
+        } else if (ucs == '\r' || ucs == '\n' || ucs == '\t') {
+            state->last.clear(); // a new line or a tab: like the start of the text
+            state->lastKnown = true;
+        } else {
+            state->last.clear(); // arrows, Home/End, Backspace, Delete: the cursor moved or text changed
+            state->lastKnown = false;
+        }
     }
 
     void deactivate(const fcitx::InputMethodEntry &entry, fcitx::InputContextEvent &event) override {
@@ -318,7 +356,9 @@ public:
 
     void reset(const fcitx::InputMethodEntry &entry, fcitx::InputContextEvent &event) override {
         auto *ic = event.inputContext();
-        commitSelected(ic, ic->propertyFor(&factory_)->word(language(entry)));
+        auto *state = ic->propertyFor(&factory_);
+        commitSelected(ic, state->word(language(entry)));
+        state->lastKnown = false; // usually a click or another cursor move
     }
 
     void commitCandidate(fcitx::InputContext *ic, size_t index) {
@@ -376,22 +416,22 @@ private:
         }
     }
 
-    // The character before the cursor, so e.g. "j" after an existing "н"
-    // produces "ь". Falls back to the last key we saw.
-    std::string contextBefore(fcitx::InputContext *ic, UdncState *state) {
+    // The character before the cursor, so e.g. "j" after an existing "н" produces "ь", and whether
+    // it's known. Falls back to the last key we saw, which is unknown after the cursor moved.
+    std::pair<std::string, bool> contextBefore(fcitx::InputContext *ic, UdncState *state) {
         if (ic->capabilityFlags().test(fcitx::CapabilityFlag::SurroundingText)) {
             const auto &st = ic->surroundingText();
             if (st.isValid()) {
                 unsigned int pos = std::min(st.cursor(), st.anchor());
                 if (pos == 0) {
-                    return {};
+                    return {"", true};
                 }
                 const std::string &text = st.text();
                 auto start = fcitx::utf8::nextNChar(text.begin(), pos - 1);
-                return std::string(start, fcitx::utf8::nextChar(start));
+                return {std::string(start, fcitx::utf8::nextChar(start)), true};
             }
         }
-        return state->last;
+        return {state->last, state->lastKnown};
     }
 
     void commitSelected(fcitx::InputContext *ic, Word &word) {
@@ -407,6 +447,7 @@ private:
         updateUI(ic, word);
         if (!text.empty()) {
             ic->commitString(text);
+            ic->propertyFor(&factory_)->lastKnown = true;
             auto lastChar = fcitx::utf8::nextNChar(text.begin(), fcitx::utf8::length(text) - 1);
             ic->propertyFor(&factory_)->last.assign(lastChar, text.end());
         }

@@ -79,7 +79,7 @@ class UkrainianTest(unittest.TestCase):
         c = Composer("uk", UK)
         for ch in "Burjan":
             c.push(ch)
-        self.assertEqual(c.candidates(), ["Бур'ян", "Бурян", "Burjan"])  # common words first
+        self.assertEqual(c.candidates()[:2], ["Бур'ян", "Бурян"])  # common words first, then the name
 
     def test_source_language_spellings(self):
         for latin, cyrillic in [("atelier", "ательє"), ("bureau", "бюро"), ("budget", "бюджет"),
@@ -88,11 +88,13 @@ class UkrainianTest(unittest.TestCase):
                                 ("chauffeur", "шофер"), ("jockey", "жокей"), ("meeting", "мітинг")]:
             self.check(latin, cyrillic)
 
-    def test_lowercase_names_come_after_native(self):
+    def test_names_need_a_capital(self):
         c = Composer("uk", UK)
-        for ch in "odesa":
-            c.push(ch)
-        self.assertEqual(c.candidates(), ["одеса", "Одеса", "odesa"])
+        type_keys(c, "odesa")
+        self.assertEqual(c.candidates(), ["одеса", "odesa"])  # no capitalized Одеса in lowercase
+        c.clear()
+        type_keys(c, "Odesa")
+        self.assertEqual(c.candidates()[0], "Одеса")
 
     def test_etymological_infinitives(self):
         self.check("choditi", "ходити")
@@ -151,7 +153,7 @@ class UkrainianTest(unittest.TestCase):
         self.check("xyz", "ксиз")
         self.check("text", "текст")
         self.assertEqual(transliterate("text", "uk", Lexicon()), "текст")
-        self.assertEqual(transliterate("photo", "uk", Lexicon()), "пгото")
+        self.assertEqual(transliterate("photo", "uk", Lexicon()), "фото")  # the guess: ph is ф
 
     def test_candidates_native_first(self):
         c = Composer("uk", UK)
@@ -203,12 +205,55 @@ class UkrainianTest(unittest.TestCase):
         c.clear()
         type_keys(c, "sxcxastja")
         self.assertEqual(c.candidates()[0], "щастя")  # šč is щ
+        self.assertIn("шчастя", c.candidates())  # and шч is offered too
         c.clear()
         type_keys(c, "stxastja")
         self.assertEqual((c.raw(), c.candidates()[0]), ("šťastja", "щастя"))  # stx marks both: šť is щ
         c.clear()
         type_keys(c, "tax")
         self.assertEqual(c.raw(), "tax")  # elsewhere x is a letter (кс)
+
+    def test_g_reads_the_same_in_a_word(self):
+        c = Composer("uk", UK)
+        type_keys(c, "geographija")
+        cands = c.candidates()
+        self.assertEqual(cands[:2], ["географія", "ґеоґрафія"])  # all г, or all ґ
+        self.assertNotIn("геоґрафія", cands)
+        self.assertNotIn("ґеографія", cands)
+
+    def test_split_variants_for_unknown_words(self):
+        c = Composer("uk", UK)
+        type_keys(c, "tjanjanjmenj")
+        cands = c.candidates()
+        self.assertEqual(cands[0], "тяняньмень")
+        for variant in ["т'яняньмень", "тьаняньмень", "тян'яньмень", "тяньаньмень"]:  # one j at a time
+            self.assertIn(variant, cands)
+        self.assertNotIn("т'ян'яньмень", cands)
+        c.clear()
+        type_keys(c, "ljusxcxenko")
+        self.assertIn("льущенко", c.candidates())  # soft split: ь + plain у
+        self.assertNotIn("льющенко", c.candidates())
+        c.clear()
+        type_keys(c, "solovjov")
+        self.assertIn("соловйов", c.candidates())  # rule (2) for o: й + о, as there's no iotated о
+        c.clear()
+        type_keys(c, "tja")
+        self.assertEqual(c.candidates()[:3], ["тя", "т'я", "тьа"])  # tja may be part of a longer word
+
+    def test_guess_with_strong_alternatives(self):
+        c = Composer("uk", UK)
+        type_keys(c, "phridon")
+        self.assertEqual(c.candidates()[:2], ["фрідон", "пгрідон"])  # not a known word, but ph is ф
+
+    def test_single_native_letter_first(self):
+        c = Composer("uk", UK)
+        type_keys(c, "ch")
+        self.assertEqual(c.candidates()[0], "х")  # not кг (kg)
+
+    def test_implicit_soft_l_and_c(self):
+        for latin, cyrillic in [("dla", "для"), ("hlopec", "хлопець"), ("cogo", "цього")]:
+            self.check(latin, cyrillic)
+        self.check("bula", "була")  # the hard reading still wins when it's a word
 
     def test_latin_mode(self):
         c = Composer("uk", UK)
@@ -249,6 +294,16 @@ class UkrainianTest(unittest.TestCase):
         for ch in "jsja":
             c.push(ch)
         self.assertEqual(c.candidates()[:2], ["йся", "ься"])
+        c.clear()
+        type_keys(c, "ji")
+        self.assertEqual(c.candidates()[-2], "'ї")  # only an apostrophe apart: offered last (before Latin)
+        c.clear()
+        c.set_context("", known=False)  # e.g. after the cursor moved in an app without surrounding text
+        type_keys(c, "jizd")
+        self.assertIn("'їзд", c.candidates())  # it might follow під: offer both
+        c.clear()
+        type_keys(c, "jakistj")
+        self.assertIn("'якість", c.candidates())  # ja, ju, je like ji: the other context's forms too
 
     def test_single_j_offers_both_letters(self):
         c = Composer("uk", UK)

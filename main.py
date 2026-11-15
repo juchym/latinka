@@ -7,10 +7,12 @@ from composer import Composer, is_hush_key, is_word_char
 def getch() -> str:
     if os.name == "nt":
         import msvcrt
+
         return msvcrt.getwch()
     else:
         import termios
         import tty
+
         fd = sys.stdin.fileno()
         old_settings = termios.tcgetattr(fd)
         try:
@@ -25,11 +27,11 @@ def main():
     lang = sys.argv[1] if len(sys.argv) > 1 else "uk"
     c = Composer(lang)
     shown = ""  # preedit currently on screen
-    last = ""   # last committed character, the context for the next word
+    last = ""  # last committed character, the context for the next word
 
     def show(text: str) -> None:
         nonlocal shown
-        sys.stdout.write("\b \b" * len(shown) + "\x1B[4m" + text + "\x1B[0m")
+        sys.stdout.write("\b \b" * len(shown) + "\x1b[4m" + text + "\x1b[0m")
         sys.stdout.flush()
         shown = text
 
@@ -49,7 +51,7 @@ def main():
         if ch == "\x03":
             break
 
-        if ch in ("\x7F", "\x08"): # \x7F on POSIX, \0x08 on NT
+        if ch in ("\x7f", "\x08"):  # \x7F on POSIX, \0x08 on NT
             if c.raw():
                 c.pop()
                 show(c.candidates()[0] if c.raw() else "")

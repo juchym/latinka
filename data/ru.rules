@@ -34,7 +34,7 @@ C   e    е   0
 *   š    ш   0
 *   ž    ж   0
 *   šč   щ   0
-*   šč   шч  1   # батюшчин
+*   šč   шч  1+apart   # батюшчин, and surnames: also offered when not a known word
 *   šť   щ   0   # stx → šť: щастя: šťastja
 
 # --- native digraphs ---
@@ -56,16 +56,16 @@ C   '    ъ   0   # подъезд: pod'jezd
 # --- alternatives the lexicon decides on ---
 !C  e    е   1
 C   e    э   1   # мэр
-C   ja   ья  1   # статья
-C   ju   ью  1
-C   je   ье  1   # платье
+C   ja   ья  1+soft   # статья
+C   ju   ью  1+soft
+C   je   ье  1+soft   # платье
 C   jo   ьё  1
 
 # --- Greco-Latin vocabulary (the regular correspondences of international words) ---
-*   ph   ф   1   # фотография: photographia
-*   th   т   1   # теория: theoria
+*   ph   ф   1*  # фотография: photographia
+*   th   т   1*  # теория: theoria
 *   th   ф   1   # орфография: orthographia
-*   rh   р   1   # ритм: rhythm
+*   rh   р   1*  # ритм: rhythm
 *   au   ав  1   # автомобиль: automobil
 *   eu   ев  1   # Европа: Europa
 *   eu   ей  1   # нейрон: neuron
@@ -78,7 +78,7 @@ C   jo   ьё  1
 *   tiu  цию 1
 *   lu   лю  1   # революция, абсолютный, иллюзия: revolutia, absolutnyj
 *   llu  ллю 1   # иллюстрация: illustratia
-*   qu   кв  1   # квадрат: quadrat
+*   qu   кв  1*  # квадрат: quadrat
 *   h    х   1   # хаос: chaos
 *   c    к   1   # клиент, культура: client, cultura
 *   ch   к   1   # оркестр: orchestr

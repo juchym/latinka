@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "You don't need Cyrillic"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = [
+dependencies = []
+
+[dependency-groups]
+dev = [
     "pygobject-stubs>=2.20.0",
 ]

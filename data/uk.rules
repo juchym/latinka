@@ -35,7 +35,7 @@
 *   š    ш   0
 *   ž    ж   0
 *   šč   щ   0
-*   šč   шч  1   # батюшчин
+*   šč   шч  1+apart   # батюшчин, and surnames: also offered when not a known word
 *   šť   щ   0   # stx → šť: щастя: šťastja
 
 # --- native digraphs ---
@@ -59,18 +59,23 @@ C   ji   'ї  0   # під'їзд
 бпвмфБПВМФ  je  є   1
 # After other consonants the apostrophe depends on morphology and etymology,
 # so it's an alternative the lexicon decides on (natively буря, моря, рясний):
-C   ja   'я  1   # бур'ян, з'ясувати, к'янті, миш'як
-C   ju   'ю  1   # роз'юшений
-C   je   'є  1   # від'єднати, кар'єра
-C   jo   йо  1   # Воробйов, Соловйов (natively сьогодні, льон)
+C   ja   'я  1+apostrophe   # бур'ян, з'ясувати, к'янті, миш'як
+C   ju   'ю  1+apostrophe   # роз'юшений
+C   je   'є  1+apostrophe   # від'єднати, кар'єра
+C   jo   йо  1+apostrophe   # Соловйов, бульйон: rule (2) for o, which has no iotated letter (natively сьогодні, льон)
 
-# Splits the whole word resolves, so no escapes are needed:
-!C  ja   йа  1   # найактивніший: najaktyvniwyj
-!C  ju   йу  1   # найулюбленіший: najuljubleniwyj
-!C  je   йе  1   # найефективніший: najefektyvniwyj
-C   ja   ьа  1   # мальабсорбція
-C   ju   ью  1   # Ньютон, лазанью: Njuton
-C   je   ье  1   # бельетаж
+# Splits the whole word resolves, so no escapes are needed. j + vowel reads as (1) the iotated
+# vowel (native), (2) after a consonant ' + iotated vowel, (3) after a consonant ь + plain vowel,
+# (4) otherwise й + plain vowel. Variants are offered in the order of the groups' first rules,
+# which follows how common each is among dictionary forms: ' 5%, й + vowel 1.4%, ь + vowel 0.01%.
+!C  ja   йа  1+iota   # найактивніший: najaktyvnišyj
+!C  ju   йу  1+iota   # найулюбленіший: najuljublenišyj
+!C  je   йе  1+iota   # найефективніший: najefektyvnišyj
+!C  ji   йі  1+iota   # найімовірніше: najimovirnisxe
+C   ja   ьа  1+soft   # мальабсорбція, Тяньаньмень
+C   ju   ью  1   # Ньютон, лазанью: Njuton (ь + iotated ю: only when it's a known word)
+C   ju   ьу  1+soft   # ь + plain у, like ьа, ье
+C   je   ье  1+soft   # бельетаж
 *   ch   цг  1   # нацгвардія, спецгрупа: nachvardija, spechrupa
 
 # apostrophe
@@ -79,10 +84,10 @@ C   'jo  йо  0
 ьЬ  'jo  йо  0   # мільйон: milj'jon
 
 # --- Greco-Latin vocabulary (the regular correspondences of international words) ---
-*   ph   ф   1   # фотографія: photographia
-*   th   т   1   # теорія: theoria
+*   ph   ф   1*  # фотографія: photographia
+*   th   т   1*  # теорія: theoria
 *   th   ф   1   # орфографія: orthographia
-*   rh   р   1   # ритм: rhythm
+*   rh   р   1*  # ритм: rhythm
 *   au   ав  1   # автомобіль: automobil
 *   eu   єв  1   # Європа: Europa
 *   eu   ей  1   # нейрон: neuron
@@ -98,7 +103,7 @@ C   'jo  йо  0
 *   tiu  цію 1
 *   lu   лю  1   # революція, абсолютний, ілюзія: revolutia, absolutnyj, iluzia
 *   llu  лю  1   # ілюстрація: illustratia
-*   qu   кв  1   # квадрат: quadrat
+*   qu   кв  1*  # квадрат: quadrat
 *   g    г   1   # галактика: galaktyka
 *   h    х   1   # хаос: chaos
 *   c    к   1   # клієнт, культура: client, cultura
@@ -132,6 +137,18 @@ C   r/C  ри  1   # кривавий, гриміти: krvavy, hrmiti
 C   r/C  ро  1   # кров: krv
 C   r/C  ер  1   # шерсть: šrst
 *   ol/C ов  1   # ковдра: koldra
+
+# implicit soft л and ц: they're the softest consonants (ць, ль at the end or before a consonant
+# ~80-90% of the time), so a missing j is supplied when it makes a known word: dla → для,
+# hlopec → хлопець, cogo → цього. The native hard reading still wins when it is a word (була).
+*   la   ля  1   # для: dla
+*   le   лє  1
+*   lo   льо 1   # льон: lon
+*   c    ць  1   # хлопець, кінець: hlopec, kinec
+*   ca   ця  1   # ця: ca
+*   cu   цю  1   # цю: cu
+*   ce   цє  1
+*   co   цьо 1   # цього: cogo
 
 # Words borrowed from living languages (bureau, chauffeur, Tiananmen) aren't
 # rules: they are listed in uk.loans.
